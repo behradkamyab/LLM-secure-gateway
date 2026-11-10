@@ -1,0 +1,19 @@
+# API Framework & Validation
+fastapi
+uvicorn
+pydantic
+
+# Machine Learning & NLP
+torch
+transformers
+sentence-transformers
+
+# Vector Database
+faiss-cpu
+
+# CPU Optimization (ONNX)
+optimum[onnxruntime]
+
+# Testing
+pytest
+httpx
