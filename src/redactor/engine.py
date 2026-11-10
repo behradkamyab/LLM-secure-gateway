@@ -1,12 +1,13 @@
 import re
 from typing import List
 import torch
-from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import AutoTokenizer
+from optimum.onnxruntime import ORTModelForTokenClassification
 
 class PIIRedactor:
     def __init__(self, model_id: str = "yonigo/deberta-v3-base-pii-en"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-        self.model = AutoModelForTokenClassification.from_pretrained(model_id)
+        self.model = ORTModelForTokenClassification.from_pretrained(model_id)
         self.id2label = self.model.config.id2label
         
         
