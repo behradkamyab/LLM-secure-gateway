@@ -5,3 +5,6 @@ __pycache__/
 *.pt
 deberta_onnx/
 minilm_onnx/
+.pytest_cache/
+
+*:Zone.Identifier
