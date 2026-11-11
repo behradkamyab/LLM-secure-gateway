@@ -3,8 +3,11 @@ __pycache__/
 *.onnx
 *.bin
 *.pt
+
 deberta_onnx/
+
 minilm_onnx/
+
 .pytest_cache/
 
 *:Zone.Identifier

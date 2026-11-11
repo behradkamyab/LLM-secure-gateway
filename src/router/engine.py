@@ -13,7 +13,7 @@ class SemanticRouter:
         self.threshold = threshold
         
         # Load the Embedding Model
-        self.model = SentenceTransformer(model_id)
+        self.model = SentenceTransformer(model_id , backend="onnx")  # Use ONNX backend for faster inference
         
         # Get the vector dimension from the model dynamically
         self.dimension = self.model.get_embedding_dimension()
