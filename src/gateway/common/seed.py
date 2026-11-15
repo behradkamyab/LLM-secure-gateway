@@ -10,3 +10,5 @@ def set_seed(seed: int = 42):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     print(f" Global RNG seeded to {seed}")
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
