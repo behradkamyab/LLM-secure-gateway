@@ -1,0 +1,26 @@
+# Environments & Secrets
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Data & Outputs (Strictly Ignored)
+data/raw/
+data/images/
+data/processed/
+outputs/*
+!outputs/.gitkeep
+wandb/
+*:zoneIdentifier
+
+# Model Weights & Binaries
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx

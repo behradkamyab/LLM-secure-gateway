@@ -1,0 +1,30 @@
+experiment:
+  id: "E0_zeroshot"
+  description: "Baseline evaluation of zero-shot DeBERTa-v3 and MiniLM before LoRA adaptation."
+  seed: 42
+
+model:
+  ner_engine:
+    name: "microsoft/deberta-v3-base"
+    task: "token-classification"
+    quantization: null
+    adapter: null  # Explicitly null because this is the baseline
+  
+  router_engine:
+    name: "sentence-transformers/all-MiniLM-L6-v2"
+    task: "feature-extraction"
+    vector_dim: 384
+    distance_metric: "cosine_similarity" # FAISS IndexFlatIP
+
+data:
+  dataset_name: "ner_dataset"
+  split: "test" # The subset used for evaluation
+  max_seq_length: 512
+
+infer:
+  batch_size: 16
+  device: "cpu" # Baseline was evaluated locally using ONNX/CPU
+
+eval:
+  metrics: ["seqeval", "hit_rate"]
+  target_entities: ["B-PII", "I-PII"]

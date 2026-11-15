@@ -1,0 +1,32 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: no-data-commits
+        name: "Block data and outputs directories"
+        language: fail
+        entry: "Synthetic JSON datasets and outputs must not be committed."
+        files: ^(data/.*\.json|outputs/(?!\.gitkeep$))
+      - id: no-weights-or-env
+        name: "Block model weights and .env secrets"
+        language: fail
+        entry: "ONNX binaries, PyTorch weights, and .env files must not be committed."
+        files: '(\.safetensors|\.ckpt|\.pt|\.onnx|(^|/)\.env)$'

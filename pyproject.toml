@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llm-secure-gateway-v2"
+version = "0.1.0"
+description = "AI Security Gateway & Semantic Router with LoRA NER Redaction"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "numpy>=1.26",
+    "python-dotenv>=1.0",
+    "tqdm>=4.66",
+    "openai", # Specifically for your Ollama synthetic data generation script
+]
+
+[project.optional-dependencies]
+# Lightweight dependencies exclusively for the live FastAPI production server
+infer = [
+    "fastapi",
+    "uvicorn",
+    "onnxruntime",
+    "faiss-cpu",
+    "transformers",         # For tokenization only
+    "sentence-transformers" # For semantic router embeddings
+]
+
+# Heavy ML dependencies exclusively for LoRA fine-tuning
+train = [
+    "torch>=2.4",
+    "transformers>=4.45",
+    "peft>=0.13",
+    "datasets",
+    "accelerate>=1.0",
+    "bitsandbytes>=0.44; sys_platform != 'darwin'", # Keeps 4-bit quantization available
+    "mlflow",               # Active experiment tracker for this project
+    "matplotlib",           # For generating evaluation charts
+]
+
+# Evaluation dependencies
+eval = [
+    "seqeval",              # Crucial for calculating precision/recall on NER BIO arrays
+    "evaluate>=0.4",
+    "scipy>=1.13",
+    "pandas>=2.2",
+    "scikit-learn",
+]
+
+dev = ["ruff>=0.8", "pytest>=8.3", "pre-commit>=4.0"]
+
+[project.scripts]
+# CLI entrypoints mapped to your package (export PKG="gateway")
+gateway-prepare = "gateway.cli:prepare_main"
+gateway-train = "gateway.cli:train_main"
+gateway-eval = "gateway.cli:eval_main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gateway"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["notebooks"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
