@@ -25,7 +25,8 @@ infer = [
     "onnxruntime",
     "faiss-cpu",
     "transformers",         # For tokenization only
-    "sentence-transformers" # For semantic router embeddings
+    "sentence-transformers", # For semantic router embeddings
+    "sentencepiece"
 ]
 
 # Heavy ML dependencies exclusively for LoRA fine-tuning
