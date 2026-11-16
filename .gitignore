@@ -16,6 +16,9 @@ outputs/*
 !outputs/.gitkeep
 wandb/
 *:zoneIdentifier
+data/*
+!data/.gitkeep
+!data/README.md
 
 # Model Weights & Binaries
 *.safetensors

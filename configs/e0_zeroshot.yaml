@@ -5,7 +5,7 @@ experiment:
 
 model:
   ner_engine:
-    name: "microsoft/deberta-v3-base"
+    name: "yonigo/deberta-v3-base-pii-en"
     task: "token-classification"
     quantization: null
     adapter: null  # Explicitly null because this is the baseline
@@ -15,6 +15,7 @@ model:
     task: "feature-extraction"
     vector_dim: 384
     distance_metric: "cosine_similarity" # FAISS IndexFlatIP
+    threshold: 0.60
 
 data:
   dataset_name: "ner_dataset"
@@ -23,7 +24,7 @@ data:
 
 infer:
   batch_size: 16
-  device: "cpu" # Baseline was evaluated locally using ONNX/CPU
+  device: "cuda" # Updated to CUDA for PyTorch inference
 
 eval:
   metrics: ["seqeval", "hit_rate"]
