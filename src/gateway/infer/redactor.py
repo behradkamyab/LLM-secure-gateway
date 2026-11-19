@@ -56,3 +56,42 @@ class PIIRedactor:
             redacted_text=redacted_text,
             entities_found=len(merged)
         )
+        
+        
+        
+    def extract_entities(self, text: str) -> list[str]:
+        """Evaluation helper: Returns exact strings instead of the redacted payload."""
+        cleaned_text = self._apply_regex(text)
+        
+        inputs = self.tokenizer(
+            cleaned_text, 
+            return_tensors="pt", 
+            return_offsets_mapping=True
+        )
+        offsets = inputs.pop("offset_mapping")[0]
+
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            best = torch.argmax(outputs.logits, dim=2)[0]
+
+        intervals = []
+        for token_idx in range(len(best)):
+            label = self.id2label[best[token_idx].item()]
+            char_start, char_end = offsets[token_idx].tolist()
+            
+            if label != "O" and not (char_start == 0 and char_end == 0):
+                intervals.append([char_start, char_end])
+        
+        intervals.sort(key=lambda x: x[0])
+        merged = []
+        for current in intervals:
+            if not merged or merged[-1][1] < current[0]:
+                merged.append(current)
+            else:
+                merged[-1][1] = max(merged[-1][1], current[1])
+                
+        extracted = []
+        for start, end in merged:
+            extracted.append(cleaned_text[start:end].strip())
+            
+        return extracted
