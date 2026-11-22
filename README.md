@@ -1,80 +1,68 @@
 # AI Security Gateway & Semantic Router
 
-**Task.** An asynchronous, production-ready FastAPI microservice acting as a security and routing layer for Enterprise RAG systems. It intercepts user prompts, redacts PII using a hybrid Regex/NER approach, and uses Vector Search to route queries to cached FAQs or downstream LLMs.
+I built an async FastAPI microservice that sits in front of Enterprise RAG systems. It intercepts user prompts, redacts PII with a hybrid Regex and NER pipeline, and routes repeated queries to cached answers using FAISS vector search before calling an external LLM.
+I evaluate zero-shot ONNX `DeBERTa-v3` (`yonigo/deberta-v3-base-pii-en`) and `all-MiniLM-L6-v2` against regex and keyword baselines. On 100 synthetic Italian IT helpdesk records (134 PII spans), the English-tuned DeBERTa model drops to 0.37 recall (0.48 F1). I am fine-tuning LoRA PEFT adapters on synthetic Italian data to close this domain-shift gap before ONNX export.
 
-**Approach.** We evaluate zero-shot ONNX `DeBERTa-v3` (Token Classification) and `all-MiniLM-L6-v2` (Sentence Embeddings) against regex/keyword baselines. To resolve Italian domain-shift vulnerabilities (54% NER recall), we adapt the DeBERTa model using Supervised Fine-Tuning (LoRA PEFT) combined with an LLM-assisted knowledge distillation data pipeline.
+| Step | What                                                          | Where                                         |
+| :--- | :------------------------------------------------------------ | :-------------------------------------------- |
+| 1    | Synthetic Italian data generation and JSONL/BIO preprocessing | `src/gateway/data/`, `notebooks/`         |
+| 2    | Zero-shot baseline evaluation and ONNX routing (`E0`)       | `src/gateway/infer/`, `src/gateway/eval/` |
+| 3    | LoRA PEFT fine-tuning (`E1+`)                               | `src/gateway/train/`                        |
+| 4    | FastAPI microservice and startup hooks                        | `src/gateway/infer/main.py`                 |
 
-| Step | What | Where |
-| :--- | :--- | :--- |
-| 1 | Data exploration & unified JSONL preprocessing (LLM synthetic gen) | `src/gateway/data/`, `notebooks/` |
-| 2 | Zero-shot baseline evaluation & ONNX routing (`E0`) | `src/gateway/infer/`, `src/gateway/eval/` |
-| 3 | Model adaptation / Fine-tuning (`E1+`) | `src/gateway/train/` |
-| 4 | FastAPI Microservice & Lifecycle Hooks | `src/gateway/infer/main.py` |
+## Project Roadmap & Status
 
----
-
-## 📍 Project Roadmap & Status
-
-This project follows an iterative MLOps lifecycle:
-
-- [x] **Phase 1: Infrastructure & Baseline Benchmarks (Completed)**
-  - Async FastAPI setup with `lifespan` model loading.
-  - Regex vs. Zero-Shot DeBERTa-v3 evaluation (NER) & Keyword vs. FAISS evaluation (Routing).
-  - Transitioned to strictly-typed ADSP project scaffold.
+- [X] **Phase 1: Infrastructure & Baseline Benchmarks (Completed)**
+  - Async FastAPI service with `lifespan` model loading and typed Pydantic schemas.
+  - Strict-boundary BIO baseline for zero-shot ONNX `DeBERTa-v3` vs Regex, and FAISS vs keyword routing.
+  - Modular project layout with `uv`, `pytest`, and `pre-commit` guards.
 - [ ] **Phase 2: Domain Adaptation via LoRA PEFT (Active)**
-  - LLM-assisted synthetic JSON data generation for high-variance Italian domain data.
-  - BIO-tagging pipeline implementation.
-  - LoRA Fine-tuning on DeBERTa to resolve enterprise domain shift.
-- [ ] **Phase 3: Production Inference Optimization (Planned)**
-  - Merging LoRA adapters and compiling the finalized model to ONNX.
-  - End-to-end latency and memory benchmarking.
-
----
+  - LLM-assisted synthetic Italian IT helpdesk generation (`data/raw/synthetic_italian.jsonl`).
+  - Subword-to-character BIO alignment and tagging pipeline.
+  - LoRA fine-tuning on DeBERTa to raise Italian PII recall above 0.95.
+- [ ] **Phase 3: Inference Optimization (Planned)**
+  - Merge LoRA adapters and export the fine-tuned model to ONNX.
+  - Benchmark end-to-end latency and memory usage.
 
 ## Setup
 
 Requires Python 3.11.
 
 ```bash
-# With uv (recommended)
 uv venv -p 3.11
-uv pip install -e ".[dev]"            # Light: schema, config, tests (CPU only)
-uv pip install -e ".[dev,infer]"      # + fastapi / onnxruntime / faiss-cpu (Production API)
-uv pip install -e ".[dev,train,eval]" # + torch / transformers / peft / seqeval (MLOps pipeline)
-
-# Install git guards and environment secrets
-pre-commit install                    # ruff + "no raw data / no weights" guards on commit
-cp .env.example .env                  # Fill in WANDB/MLflow keys (never commit .env)
+uv pip install -e ".[dev]"            # Schema, config, and unit tests (CPU only)
+uv pip install -e ".[dev,infer]"      # FastAPI, ONNX Runtime, and FAISS (API server)
+uv pip install -e ".[dev,train,eval]" # PyTorch, Transformers, PEFT, and seqeval
+pre-commit install                    # Runs ruff and blocks raw data or model weights
+cp .env.example .env                  # Add local API / tracking keys (never commit .env)
 ```
 
-## 📂 Folder Map
-* `configs/` - one YAML per experiment (E0 zero-shot, E1 LoRA, …)
-* `data/` - download/preprocess scripts + ID lists ONLY (no raw JSONs in git)
-* `src/gateway/data/` - LLM generation scripts -> unified JSONL/BIO arrays
-* `src/gateway/infer/` - FastAPI gateway, ONNX router, and redaction microservices
-* `src/gateway/train/` - LoRA SFT training loops
-* `src/gateway/eval/` - seqeval metrics and performance chart generation
-* `src/gateway/common/` - JSONL schema, config loading, logging (shared)
-* `outputs/` - trained adapters, scores CSV (gitignored)
-* `docs/` - architecture diagrams and evaluation reports
-* `tests/` - unit and repository hygiene tests
+## Folder Map
 
----
+- `configs/`: One YAML config per experiment (`E0` zero-shot, `E1` LoRA).
+- `data/`: Preprocessing scripts and split manifests (no raw JSON files in Git).
+- `src/gateway/data/`: Synthetic data generation and JSONL/BIO formatting.
+- `src/gateway/infer/`: FastAPI gateway, ONNX PII redactor, and FAISS router.
+- `src/gateway/train/`: LoRA supervised fine-tuning loops.
+- `src/gateway/eval/`: `seqeval` strict-BIO metrics and evaluation scripts.
+- `src/gateway/common/`: Shared schemas, config loader, and logging.
+- `outputs/`: Trained adapters and score files (gitignored).
+- `report/`: Diagnostic evaluation reports.
+- `tests/`: Unit and repository hygiene tests.
 
-## 🚀 The API Gateway
+## Running the API Gateway
 
-On startup, the API initializes the brain. Through the async `lifespan` handler, it safely downloads and loads the ONNX models into RAM, compiles the target FAISS dataset, and prepares your CPU-accelerated worker pool *before* allowing the gateway to receive its first network request.
+The FastAPI `lifespan` hook loads the ONNX models into RAM and builds the FAISS index at startup before serving requests.
 
 ```bash
-# Run using the lightweight infer dependencies
 uvicorn src.gateway.infer.main:app --reload
 ```
 
-### 🔌 API Usage
+### API Usage
 
 **Endpoint:** `POST /api/v1/gateway`
-
 **Request:**
+
 ```json
 {
   "prompts": [
@@ -84,6 +72,7 @@ uvicorn src.gateway.infer.main:app --reload
 ```
 
 **Response:**
+
 ```json
 {
   "results": [
@@ -100,41 +89,33 @@ uvicorn src.gateway.infer.main:app --reload
 }
 ```
 
----
+## Architecture
 
-## 🏗 Architecture
+Every prompt passes through four stages before reaching an external LLM:
 
-<p align="center">
-  <img src="docs/images/architecture.jpg" alt="AI Security Gateway Pipeline Architecture" width="100%">
-</p>
+1. **Input normalization:** Cleans whitespace and casing.
+2. **Regex redaction:** Strips structured PII such as emails, phone numbers, and card numbers.
+3. **NER redaction:** Runs ONNX `DeBERTa-v3` token classification for names and organizations, merging split subword spans.
+4. **Semantic routing:** Embeds the redacted prompt with `all-MiniLM-L6-v2` and runs cosine search over a FAISS `IndexFlatIP` index to return cached FAQ answers.
 
-This gateway executes a strict pipeline before any prompt touches a generative LLM:
-1. **Input Normalization:** Sanitizes whitespace and structural casing.
-2. **Deterministic Redaction (Regex):** Strips structured PII (Emails, Phone Numbers, Credit Cards).
-3. **Probabilistic Redaction (NER):** Uses `DeBERTa-v3` token classification for unstructured PII (Names, Organizations). Implements interval-merging for subword fragmentation.
-4. **Semantic Routing:** Embeds the sanitized prompt using `all-MiniLM-L6-v2` and searches a `FAISS` IndexFlatIP (Cosine Similarity) C++ struct to return cached answers in $O(N)$ time.
-
----
-
-## 📊 Evaluation Results (Phase 1 Baseline)
+## Evaluation Results (Phase 1 Baseline)
 
 ### Semantic Router (Hit Rate @ 1)
-| Engine | Strategy | Hit Rate |
-| :--- | :--- | :--- |
-| **Baseline** | Rigid Keyword Substrings | 0.0% |
-| **FAISS AI** | Cosine Similarity (`all-MiniLM-L6-v2`) | **80.0%** |
 
-### PII Redaction (Entity Extraction)
-| Engine | Strategy | Recall | Precision | F1-Score |
-| :--- | :--- | :--- | :--- | :--- |
-| **Baseline** | Regex & Casing | 0.07 | 0.02 | 0.03 |
-| **Zero-Shot AI** | `DeBERTa-v3` Token Classification | **0.54** | **0.62** | **0.57** |
+| Engine             | Strategy                                 | Hit Rate        |
+| :----------------- | :--------------------------------------- | :-------------- |
+| **Baseline** | Keyword Substrings                       | 0.0%            |
+| **FAISS**    | Cosine Similarity (`all-MiniLM-L6-v2`) | **80.0%** |
 
-*Note: The 54% Recall rate on the DeBERTa model identified a critical domain shift vulnerability regarding Italian naming conventions and enterprise structures. This is actively being resolved in Phase 2 via LoRA fine-tuning. See `docs/model_evaluation_report.md` for the full diagnostic breakdown.*
+### PII Redaction (Strict-Boundary BIO, 100 Italian IT Helpdesk Records / 134 PII Spans)
 
----
+| Engine                                                                                                                                                                                                                                                     | Model / Strategy                  | Precision      | Recall         | F1-Score       |
+| :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------- | :------------- | :------------- | :------------- |
+| **Baseline**                                                                                                                                                                                                                                         | Regex & Casing                    | 0.02           | 0.07           | 0.03           |
+| **Zero-Shot ONNX**                                                                                                                                                                                                                                   | `yonigo/deberta-v3-base-pii-en` | **0.66** | **0.37** | **0.48** |
+| Evaluation uses subword-to-character BIO alignment on `data/splits/test.jsonl` so tokenization splits do not skew span metrics. The 0.37 recall (63% missed PII on Italian names and corporate IDs) is the baseline target for Phase 2 LoRA fine-tuning. |                                   |                |                |                |
 
-## 🛡️ Data & Reproducibility Policy
-- Never commit raw data or weights: `data/`, `outputs/**`, `*.safetensors`, `*.onnx`, `mlruns/`, and `.env` are strictly gitignored and blocked by pre-commit hooks.
-- Secrets: API tokens live exclusively in `.env`.
-- Reproducibility: Global seed 42 is enforced across Python, NumPy, and PyTorch.
+## Data & Reproducibility Policy
+
+- Raw data, weights, and secrets (`data/`, `outputs/**`, `*.safetensors`, `*.onnx`, `mlruns/`, `.env`) are gitignored and blocked by `pre-commit` hooks.
+- Global seed `42` is fixed across Python, NumPy, and PyTorch.
