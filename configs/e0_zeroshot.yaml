@@ -20,6 +20,7 @@ model:
 data:
   dataset_name: "ner_dataset"
   split: "test" # The subset used for evaluation
+  test_path: "data/processed/test.jsonl"
   max_seq_length: 512
 
 infer:

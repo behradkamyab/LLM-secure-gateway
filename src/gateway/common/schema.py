@@ -1,40 +1,66 @@
-from pydantic import BaseModel, Field
-from typing import List
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class PIIEntity(BaseModel):
-    """A specific slice of text that represents private data."""
-    text: str
-    label: str  # e.g., "PERSON", "ORG", "CREDIT_CARD"
+    """A slice of text that holds private data."""
 
-class SyntheticDataRecord(BaseModel):
-    """The JSON contract for the unstructured generated text."""
-    id: str
-    original_prompt: str
-    entities: List[PIIEntity] = Field(default_factory=list)
+    model_config = ConfigDict(str_strip_whitespace=True)
 
+    text: str = Field(..., min_length=1)
+    label: str = Field(default="PII", min_length=1)
+
+
+class PIIRecord(BaseModel):
+    """Shared format for both synthetic training rows and test split rows."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    id: str = Field(..., min_length=1)
+    original_prompt: str = Field(..., min_length=1)
+    entities: list[PIIEntity] = Field(default_factory=list)
 
 
 class TokenizedNERRecord(BaseModel):
-    """The strict mathematical array contract required by PyTorch/Hugging Face."""
-    id: str
-    input_ids: List[int]
-    attention_mask: List[int]
-    labels: List[int]  # Integers matching B-PII, I-PII, O, and -100 for ignored subwords
-    
-    
-    
+    """Token IDs, attention mask, and BIO label IDs for PyTorch and Hugging Face."""
+
+    id: str = Field(..., min_length=1)
+    input_ids: list[int] = Field(..., min_length=1)
+    attention_mask: list[int] = Field(..., min_length=1)
+    labels: list[int] = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def check_array_lengths_match(self) -> "TokenizedNERRecord":
+        n_ids = len(self.input_ids)
+        if len(self.attention_mask) != n_ids or len(self.labels) != n_ids:
+            raise ValueError("input_ids, attention_mask, and labels must have the same length.")
+        return self
+
+
 class RedactionRequest(BaseModel):
-    """Ingress web payload validation."""
-    text: str = Field(..., max_length=2000, description="The raw user prompt to redact.")
+    """Incoming web request payload."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    text: str = Field(
+        ...,
+        min_length=1,
+        max_length=2000,
+        description="The raw user prompt to redact.",
+    )
+
 
 class RedactedResponse(BaseModel):
-    """Egress web payload validation."""
+    """Outgoing redacted web response payload."""
+
     original_text: str
     redacted_text: str
-    entities_found: int
+    entities_found: int = Field(..., ge=0)
+
 
 class RouteResponse(BaseModel):
-    """Semantic routing classification response."""
-    destination: str
+    """Semantic router decision and similarity score."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    destination: str = Field(..., min_length=1)
     confidence_score: float

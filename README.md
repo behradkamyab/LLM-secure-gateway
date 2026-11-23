@@ -1,7 +1,7 @@
 # AI Security Gateway & Semantic Router
 
 I built an async FastAPI microservice that sits in front of Enterprise RAG systems. It intercepts user prompts, redacts PII with a hybrid Regex and NER pipeline, and routes repeated queries to cached answers using FAISS vector search before calling an external LLM.
-I evaluate zero-shot ONNX `DeBERTa-v3` (`yonigo/deberta-v3-base-pii-en`) and `all-MiniLM-L6-v2` against regex and keyword baselines. On 100 synthetic Italian IT helpdesk records (134 PII spans), the English-tuned DeBERTa model drops to 0.37 recall (0.48 F1). I am fine-tuning LoRA PEFT adapters on synthetic Italian data to close this domain-shift gap before ONNX export.
+I evaluate zero-shot `DeBERTa-v3` (`yonigo/deberta-v3-base-pii-en`) and `all-MiniLM-L6-v2` against regex and keyword baselines on 100 synthetic Italian IT helpdesk records (134 PII spans). The initial zero-shot NER baseline scored 0.37 recall (0.48 F1). After cleaning the test split into full Italian JSONL records and fixing an email regex evaluation bug in Issue #7, the hybrid zero-shot baseline reaches 0.81 recall (0.77 F1), while still missing 19% of Italian names and card numbers. I am fine-tuning LoRA PEFT adapters on synthetic Italian data to push recall above 0.95 before ONNX export.
 
 | Step | What                                                          | Where                                         |
 | :--- | :------------------------------------------------------------ | :-------------------------------------------- |
@@ -109,11 +109,20 @@ Every prompt passes through four stages before reaching an external LLM:
 
 ### PII Redaction (Strict-Boundary BIO, 100 Italian IT Helpdesk Records / 134 PII Spans)
 
-| Engine                                                                                                                                                                                                                                                     | Model / Strategy                  | Precision      | Recall         | F1-Score       |
-| :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------- | :------------- | :------------- | :------------- |
-| **Baseline**                                                                                                                                                                                                                                         | Regex & Casing                    | 0.02           | 0.07           | 0.03           |
-| **Zero-Shot ONNX**                                                                                                                                                                                                                                   | `yonigo/deberta-v3-base-pii-en` | **0.66** | **0.37** | **0.48** |
-| Evaluation uses subword-to-character BIO alignment on `data/splits/test.jsonl` so tokenization splits do not skew span metrics. The 0.37 recall (63% missed PII on Italian names and corporate IDs) is the baseline target for Phase 2 LoRA fine-tuning. |                                   |                |                |                |
+| Stage | Model / Strategy | Dataset Split | Precision | Recall | F1-Score |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Baseline** | Regex & Casing | `data/splits/test.json` | 0.02 | 0.07 | 0.03 |
+| **Zero-Shot v1 (Initial Baseline)** | `yonigo/deberta-v3-base-pii-en` | `data/splits/test.json` (English templates + Italian names) | **0.66** | **0.37** | **0.48** |
+| **Zero-Shot v2 (Italian JSONL Split)** | `yonigo/deberta-v3-base-pii-en` (Pure NER) | `data/processed/test.jsonl` (Full Italian sentences) | 0.68 | 0.66 | 0.67 |
+| **Zero-Shot v3 (Current Hybrid Baseline)** | Email Regex + `yonigo/deberta-v3-base-pii-en` | `data/processed/test.jsonl` (Full Italian sentences) | **0.73** | **0.81** | **0.77** |
+
+#### Why the Baseline Metrics Changed (Issue #7 Evaluation Cleanup)
+
+If you came here from my resume, you saw the initial zero-shot baseline (**Precision `0.66`, Recall `0.37`, F1 `0.48`**). During the Issue #7 data-layer audit, I found and fixed two evaluation bottlenecks on the same 100 records (134 PII entities):
+
+1. **Zero-Shot v1 -> v2 (`0.37` -> `0.66` Recall):** The original `data/splits/test.json` file placed Italian names inside 5 English sentence templates (such as `"Please contact Antonietta Gotti..."`). On those mixed-language sentences, DeBERTa often tagged only the surname (`"Gotti"`) and missed the Italian first name. Because `seqeval` runs in strict IOB2 mode, partial name matches count as both a miss and a false positive. When I converted the 100 records into full Italian sentences in `data/processed/test.jsonl` (`"Per favore contatta Antonietta Gotti..."`), DeBERTa predicted the full two-word name spans, raising pure-NER recall to `0.66` (`F1 0.67`).
+2. **Zero-Shot v2 -> v3 (`0.66` -> `0.81` Recall):** In `PIIRedactor.extract_entities()`, `_apply_regex()` was replacing all 22 email addresses (`16.4%` of the 134 entities) with `[REDACTED]` before DeBERTa ran, and omitting those regex matches from the returned entity list. I updated `extract_entities()` to return both regex-matched emails and DeBERTa NER spans (and tightened the email regex so it does not consume trailing sentence periods). This raised hybrid zero-shot recall to `0.81` (`F1 0.77`).
+3. **Remaining Gap for Phase 2 LoRA:** Even after fixing the email regex path, the English-tuned DeBERTa model still misses **19% of PII** (Italian names and card numbers) and produces **27% false positives** (`Precision 0.73`) on hardware names (`Acer Nitro`) and Italian company names (`Faugno-Fittipaldi SPA`). See `report/baseline_evaluation.md` for the full diagnostic breakdown.
 
 ## Data & Reproducibility Policy
 
