@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from gateway.common.jsonl import load_jsonl, save_jsonl
 from gateway.common.schema import PIIEntity, PIIRecord
 from gateway.data.generate import parse_llm_batch
+from gateway.infer.redactor import EMAIL_PATTERN
 
 
 def test_jsonl_typed_roundtrip_and_generator_streaming(tmp_path: Path):
@@ -101,3 +102,9 @@ def test_parse_llm_batch_filters_hallucinated_spans():
     assert len(records) == 1
     assert records[0].id == "syn-10"
     assert len(records[0].entities) == 2
+
+
+def test_email_regex_strips_trailing_sentence_period():
+    sentence = "Per favore contatta Antonietta Gotti all'indirizzo moorelouis@example.com."
+    matches = EMAIL_PATTERN.findall(sentence)
+    assert matches == ["moorelouis@example.com"]
