@@ -20,10 +20,6 @@ class PIIRecord(BaseModel):
     entities: list[PIIEntity] = Field(default_factory=list)
 
 
-# Temporary alias so loader.py keeps working until Step 3 renames it to generate.py
-SyntheticDataRecord = PIIRecord
-
-
 class TokenizedNERRecord(BaseModel):
     """Token IDs, attention mask, and BIO label IDs for PyTorch and Hugging Face."""
 

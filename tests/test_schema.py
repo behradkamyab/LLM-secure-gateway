@@ -7,7 +7,6 @@ from gateway.common.schema import (
     RedactedResponse,
     RedactionRequest,
     RouteResponse,
-    SyntheticDataRecord,
     TokenizedNERRecord,
 )
 
@@ -33,7 +32,6 @@ def test_pii_record_valid_and_empty_entities():
     )
     assert record.id == "rec-1"
     assert record.entities == []
-    assert SyntheticDataRecord is PIIRecord
 
 
 def test_pii_record_rejects_empty_or_whitespace_prompt():

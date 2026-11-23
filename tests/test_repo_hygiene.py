@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from gateway.common.jsonl import load_jsonl, save_jsonl
 from gateway.common.schema import PIIEntity, PIIRecord
+from gateway.data.generate import parse_llm_batch
 
 
 def test_jsonl_typed_roundtrip_and_generator_streaming(tmp_path: Path):
@@ -72,3 +73,31 @@ def test_load_jsonl_untyped_and_missing_file(tmp_path: Path):
 
     with pytest.raises(FileNotFoundError):
         load_jsonl(tmp_path / "does_not_exist.jsonl")
+
+
+def test_parse_llm_batch_filters_hallucinated_spans():
+    raw_payload = """
+    {
+      "records": [
+        {
+          "id": "dup-id",
+          "original_prompt": "Sono Marco Carta e la mia email e marco@azienda.it.",
+          "entities": [
+            {"text": "Marco Carta", "label": "PERSON"},
+            {"text": "marco@azienda.it", "label": "EMAIL"}
+          ]
+        },
+        {
+          "id": "dup-id",
+          "original_prompt": "Ho bisogno di supporto VPN.",
+          "entities": [
+            {"text": "Nome Inventato", "label": "PERSON"}
+          ]
+        }
+      ]
+    }
+    """
+    records = parse_llm_batch(raw_payload, start_index=10)
+    assert len(records) == 1
+    assert records[0].id == "syn-10"
+    assert len(records[0].entities) == 2
