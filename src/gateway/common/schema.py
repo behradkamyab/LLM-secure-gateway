@@ -64,3 +64,17 @@ class RouteResponse(BaseModel):
 
     destination: str = Field(..., min_length=1)
     confidence_score: float
+
+
+class GatewayResponse(BaseModel):
+    """Combined gateway response with routing decision and optional redacted payload."""
+
+    route: RouteResponse
+    redacted_payload: RedactedResponse | None = None
+
+
+class HealthResponse(BaseModel):
+    """Service readiness check payload."""
+
+    status: str
+    model_loaded: bool
