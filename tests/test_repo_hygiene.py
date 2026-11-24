@@ -124,3 +124,8 @@ def test_dockerfile_and_dockerignore_production_rules():
     for blocked in (".venv", ".git", ".env", "outputs", "data/*"):
         assert blocked in dockerignore
     assert "!data/router_intents.json" in dockerignore
+
+
+def test_pyproject_declares_gateway_serve_entrypoint():
+    pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+    assert 'gateway-serve = "gateway.cli:serve_main"' in pyproject
