@@ -108,3 +108,19 @@ def test_email_regex_strips_trailing_sentence_period():
     sentence = "Per favore contatta Antonietta Gotti all'indirizzo moorelouis@example.com."
     matches = EMAIL_PATTERN.findall(sentence)
     assert matches == ["moorelouis@example.com"]
+
+
+def test_dockerfile_and_dockerignore_production_rules():
+    dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+    assert "FROM python:3.11-slim" in dockerfile
+    assert "uv pip install --system" in dockerfile
+    assert "libgomp1" in dockerfile
+    assert "USER appuser" in dockerfile
+    assert "HEALTHCHECK" in dockerfile
+    assert "/health" in dockerfile
+    assert "gateway.infer.main:app" in dockerfile
+
+    dockerignore = Path(".dockerignore").read_text(encoding="utf-8")
+    for blocked in (".venv", ".git", ".env", "outputs", "data/*"):
+        assert blocked in dockerignore
+    assert "!data/router_intents.json" in dockerignore
