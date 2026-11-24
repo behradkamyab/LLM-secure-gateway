@@ -52,22 +52,31 @@ cp .env.example .env                  # Add local API / tracking keys (never com
 
 ## Running the API Gateway
 
-The FastAPI `lifespan` hook loads the ONNX models into RAM and builds the FAISS index at startup before serving requests.
+The FastAPI `lifespan` hook loads the PyTorch models and builds the FAISS index once at startup before serving requests.
 
 ```bash
-uvicorn src.gateway.infer.main:app --reload
+# Run locally with uvicorn or the CLI script
+uv run uvicorn gateway.infer.main:app --reload
+uv run gateway-serve
+```
+
+You can also build and run the production Docker container:
+
+```bash
+docker build -t llm-secure-gateway .
+docker run --rm -p 8000:8000 -v ~/.cache/huggingface:/app/.cache/huggingface llm-secure-gateway
 ```
 
 ### API Usage
 
-**Endpoint:** `POST /api/v1/gateway`
+**Health Check:** `GET /health` returns `{"status": "ok", "model_loaded": true}`.
+
+**Gateway Endpoint:** `POST /api/v1/gateway`
 **Request:**
 
 ```json
 {
-  "prompts": [
-    "My name is Behrad and I spilled coffee on my ThinkPad."
-  ]
+  "text": "Mi chiamo Lorenzo Bianchi e la mia email è lorenzo.b@azienda.it."
 }
 ```
 
@@ -75,19 +84,19 @@ uvicorn src.gateway.infer.main:app --reload
 
 ```json
 {
-  "results": [
-    {
-      "original_prompt": "My name is Behrad and I spilled coffee on my ThinkPad.",
-      "redacted_prompt": "My name is [REDACTED] and I spilled coffee on my ThinkPad.",
-      "routing": {
-        "action": "CACHE_HIT",
-        "score": 0.6389,
-        "response": "What do I do if I spilled water on my laptop?"
-      }
-    }
-  ]
+  "route": {
+    "destination": "LLM_PIPELINE",
+    "confidence_score": 0.1421
+  },
+  "redacted_payload": {
+    "original_text": "Mi chiamo Lorenzo Bianchi e la mia email è lorenzo.b@azienda.it.",
+    "redacted_text": "Mi chiamo [REDACTED] e la mia email è [REDACTED].",
+    "entities_found": 2
+  }
 }
 ```
+
+When a prompt matches a cached FAQ above the router threshold, `route.destination` returns the FAQ category and `redacted_payload` is `null`.
 
 ## Architecture
 
